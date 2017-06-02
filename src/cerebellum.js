@@ -29,6 +29,113 @@ cluster.prototype.cerebellumSettings = function cerebellumSettings( config ) {
 
 }
 
+cluster.prototype.cerebellumStartWorker = function cerebellumStartWorker( args ) {
+
+	const cluster = this
+	const envArgs = typeof args === 'function' ? args() : args
+	const worker = cluster.fork(envArgs)
+
+	if(cluster.cerebellum._useOnline) {
+
+		worker.on('online', () => worker.emit('started'))
+
+	} else {
+
+		worker.on('listen', () => worker.emit('started'))
+
+	}
+
+	return worker
+
+}
+
+cluster.prototype.cerebellumRestartWorker = function cerebellumRestartWorker( workerId ) {
+
+	const cluster = this
+	const worker = cluster.workers[ workerId ]
+
+	if(!worker)
+		return
+
+	cluster.cerebellumStopWorkerGracefully( workerId )
+
+	worker.on('disconnect', () => {
+
+		const newWorker = cluster.cerebellumStartWorker()
+
+		newWorker.on('started', () => {
+
+			cluster.emit('restartedWorker', workerId)
+		})
+	})
+
+}
+
+cluster.prototype.cerebellumStopWorkerGracefully = function cerebellumStopWorkerGracefully( workerId, callback ) {
+
+	const cluster = this
+
+	if(!workerId) {
+
+		// stop if no work needs to be done
+		if( cluster.cerebellum._workersToStop.length === 0 ) return
+
+		const _workerId = cluster.cerebellum._workersToStop[0]
+		const _workersToStop = cluster.cerebellum._workersToStop.slice(1)
+
+		cluster.cerebellum._workersToStop = _workersToStop
+
+		return cluster.cerebellumStopWorkerGracefully( _workerId, cluster.cerebellumStartWorkers )
+
+	}
+
+	const worker = cluster.workers[ workerId ]
+
+	worker.send({ type: 'shutdown' })
+
+	const _killWorkerAfterTimeout = setTimeout(() => {
+
+		worker.kill()
+
+		if(typeof callback === 'function')
+			callback()
+
+	}, cluster.cerebellum.workeStopTimeout )
+
+	worker.on('disconnect', () => {
+
+		// need to call disconnect, to remove worker from cluster.workers array
+		worker.disconnect()
+		if(typeof callback === 'function')
+			callback()
+
+		clearTimeout(_killWorkerAfterTimeout)
+
+	})
+
+	return worker
+
+}
+
+
+
+
+
+
+
+
+
+
+// #############################################################################################################
+
+
+
+
+
+
+
+
+
 cluster.prototype.cerebellumStartWorkers = function cerebellumStartWorkers( args ) {
 
 	const cluster = this
@@ -108,51 +215,5 @@ cluster.prototype.cerebellumStopWorkersGracefully = function cerebellumStopWorke
 	cluster.cerebellum._haltProcess = true
 
 	Object.keys(cluster.workers).forEach( cluster.cerebellumStopWorkerGracefully )
-
-}
-
-cluster.prototype.cerebellumStopWorkerGracefully = function cerebellumStopWorkerGracefully( workerId, callback ) {
-
-	const cluster = this
-
-	if(!workerId) {
-
-		// stop if no work needs to be done
-		if( cluster.cerebellum._workersToStop.length === 0 ) return
-
-		const _workerId = cluster.cerebellum._workersToStop[0]
-		const _workersToStop = cluster.cerebellum._workersToStop.slice(1)
-
-		cluster.cerebellum._workersToStop = _workersToStop
-
-		return cluster.cerebellumStopWorkerGracefully( _workerId, cluster.cerebellumStartWorkers )
-
-	}
-
-	const worker = cluster.workers[ workerId ]
-
-	worker.send({ type: 'shutdown' })
-
-	const _killWorkerAfterTimeout = setTimeout(() => {
-
-		worker.kill()
-
-		if(typeof callback === 'function')
-			callback()
-
-	}, cluster.cerebellum.workeStopTimeout )
-
-	worker.on('disconnect', () => {
-
-		// need to call disconnect, to remove worker from cluster.workers array
-		worker.disconnect()
-		if(typeof callback === 'function')
-			callback()
-
-		clearTimeout(_killWorkerAfterTimeout)
-
-	})
-
-	return worker
 
 }
