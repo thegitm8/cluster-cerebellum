@@ -1,5 +1,5 @@
-examples/
+/.notes/
+example/
 src/
 test/
 .eslintrc
-API.md
