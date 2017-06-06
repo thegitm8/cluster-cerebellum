@@ -5,7 +5,8 @@
   "scripts": {
     "build": "rm -rf lib/ && ./node_modules/.bin/babel src --out-dir lib --ignore test/*.spec.js",
     "dev": "./node_modules/.bin/babel src -d lib --watch",
-    "test": "./node_modules/.bin/mocha test/cluster-cerebellum.spec.js"
+    "test": "./node_modules/.bin/mocha test/cluster-cerebellum.spec.js",
+    "example:basic": "DEBUG=cerebellum* node example/basic"
   },
   "keywords": [
     "cluster"
@@ -29,5 +30,8 @@
     "chai": "^3.5.0",
     "eslint": "^3.19.0",
     "mocha": "^3.4.2"
+  },
+  "dependencies": {
+    "debug": "^2.6.8"
   }
 }

@@ -1,72 +1,190 @@
 'use strict'
 
-const cluster = require('cluster')
-const cerebellum = require('./cerebellum')
+const cluster 		= require('cluster')
+const os 			= require('os')
+const util 			= require('util')
+const EventEmitter 	= require('events').EventEmitter
+const debug 		= require('debug')('cerebellum:master')
+const {
+	cerebellumRestartWorker,
+	cerebellumStopWorkerGracefully } 	= require('./cerebellum')
 
-function setupCerebellumConfiguration( config ) {
+const cerebellumSetupCluster = require('./settings')
 
-	const cluster = this
-	const setupMasterKeys = [ 'execArgv', 'exec', 'args', 'silent', 'stdio', 'uid', 'gid' ]
+function CerebellumInterface() {
 
-	const clusterSettings = Object.keys(config).reduce((a, next) => {
+	// cerebellum is an instance of eventEmitter
+	EventEmitter.call(this)
 
-		if(setupMasterKeys.indexOf(config[next]) > -1)
-			a[next] = config[next]
+	let haltCluster = false
+
+	/**
+	 * [setupCluster description]
+	 * @param  {[type]} configuration [description]
+	 * @return {[type]}               [description]
+	 */
+	this.setupCluster = function _setupCluster(configuration) {
+
+		debug('Setting up cluster.')
+
+		const that = this
+
+		that.settings = cerebellumSetupCluster(configuration)
+
+		// configure cluster module
+		cluster.setupMaster(that.settings.cluster)
+
+		cluster.on('fork', worker => {
+
+			// decorating new workers
+			worker.expectedNumberOfWorkers 	= that.settings.expectedNumberOfWorkers
+			worker.timeToWaitBeforeKill 	= that.settings.timeToWaitBeforeKill
+			worker.useOnline 				= that.settings.useOnline
+			worker.restart 					= that.settings.restart
+			worker.log 						= that.settings.log(worker)
+
+			let exitToDisconnectDelay
+
+			// creating unified and predictable worker events
+			worker
+				// starting worker
+				.on(worker.useOnline ? 'online' : 'listening', () => worker.emit('_cerebellumWorkerStarted'))
+				.on('_cerebellumWorkerStarted', () => {
+
+					
+
+					worker.log(`[${Object.keys(cluster.workers).length}/${worker.expectedNumberOfWorkers}] New worker forked.`)
+
+					process.nextTick(() => worker.emit('workerStarted', worker))
+					process.nextTick(() => that.emit('workerStarted', worker))
+
+				})
+				.on('disconnect', () => exitToDisconnectDelay = Date.now())
+				.on('exit', (code, signal) => {
 
 
-		return a
+					// remove worker from cluster.workers object
+					delete cluster.workers[worker.id]
 
-	}, {})
+					worker.log(`[${Object.keys(cluster.workers).length}/${worker.expectedNumberOfWorkers}] Worker stopped with signal [${signal}] and code [${code}].`)
 
-	cluster.setupMaster(clusterSettings)
+					worker.log(`Delay between "exit" and "disconnect": ${Date.now() - exitToDisconnectDelay}`)
 
-	return {
-		// runtime
-		
+					process.nextTick(() => worker.emit('workerStopped', worker))
+					process.nextTick(() => that.emit('workerStopped', worker))
 
-		// configuration
-		clusterSettings: 			clusterSettings,
-		expectedNumberOfWorkers: 	config.worker || process.env.CEREBELLUM_NUM_OF_WORKERS || os.cpus().length,
-		workeStopTimeout: 			config.workerTimeout || 2000
+				})
+				.on('error', () => worker.log('error'))
+				.on('workerStopped', () => {
+
+					if(worker.restart && !haltCluster) {
+
+						worker.log('Restarting worker.')
+						cluster.fork()
+
+					}
+
+				})
+				
+
+		})
+
+	}
+
+	/**
+	 * [startCluster description]
+	 * @return {[type]} [description]
+	 */
+	this.startCluster = function _startCluster(config) {
+
+		debug('Starting a new cluster.')
+
+		const that = this
+		const _runningWorkers = () => cluster.workers ? Object.keys(cluster.workers).length : 0
+		const currentNumberOfWorkers 	= () => Object.keys(cluster.workers).length
+
+		if(!that.settings)
+			that.settings = cerebellumSetupCluster(config)
+
+		// forking worker until runningWorkers === expectedNumberOfWorkers
+		while(_runningWorkers() <= that.settings.expectedNumberOfWorkers) {
+
+			if(_runningWorkers() === that.settings.expectedNumberOfWorkers) {
+
+				// wait one tick before informing listeners
+				process.nextTick(() => that.emit('allWorkersStarted'))
+				break
+
+			}
+
+			cluster.fork()
+
+		}
+
+	}
+
+	/**
+	 * [stopCluster description]
+	 * @return {[type]} [description]
+	 */
+	this.stopCluster = function _stopWorkersGracefully() {
+
+		debug('Halting the cluster.')
+
+		haltCluster = true
+
+		Object.keys(cluster.workers).forEach( pid => cerebellumStopWorkerGracefully(cluster.workers[pid], false) )
+
+	}
+
+	/**
+	 * [killCluster description]
+	 * @return {[type]} [description]
+	 */
+	this.killCluster = function _killCluster() {
+
+		debug('Killing cluster.')
+
+		haltCluster = true
+
+		Object.keys(cluster.workers).forEach( pid => cluster.workers[pid].kill() )
+
+	}
+
+	/**
+	 * [restartCluster description]
+	 * @param  {[type]} workerPid [description]
+	 * @return {[type]}           [description]
+	 */
+	this.restartCluster = function _restartCluster() {
+
+		debug('Restarting cluster')
+
+		const that = this
+
+		function restartWorker(workers) {
+
+			if(workers.length < 1) {
+				that.emit('allWorkersRestarted')
+				return
+			}
+
+			const worker = workers[0]
+			const nextWorkers = workers.slice(1)
+
+			return cerebellumStopWorkerGracefully(worker)
+				.on('workerStopped', () => restartWorker(nextWorkers))
+
+		}
+
+		const workersToRestart = Object.keys(cluster.workers).map( id => cluster.workers[id] )
+
+		return restartWorker(workersToRestart)
+
 	}
 
 }
 
-function clusterCerebellumInterface( config ) {
+util.inherits(CerebellumInterface, EventEmitter)
 
-	const settings = setupCerebellumConfiguration( config )
-	const _workersToStop = []
-	const _haltProcess = false
-	const _useOnline = config.useOnline || false
-
-	function startWorkers(args = {}) {
-		
-		cluster.cerebellumStartWorkers( args )
-
-	}
-
-	function stopWorkersGracefully() {
-
-		cluster.cerebellum.haltProcess = true
-		cluster.cerebellum.workersToStop = Object.keys(cluster.workers)
-
-		cluster.cerebellumStopNextWorker()
-
-	}
-
-	function restartWorkers(workerPid) {
-
-		_workersToStop = Object.keys(cluster.workers)
-
-		_stopNextWorker()
-
-	}
-	
-
-	return {
-		start: 		startWorkers,
-		restart: 	restartWorkers,
-		stop: 		stopWorkersGracefully
-	}
-
-}
+module.exports = new CerebellumInterface()
