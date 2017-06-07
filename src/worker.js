@@ -1,23 +1,41 @@
 'use strict'
 
-process.on('message', msg => {
-
-	switch(msg.type) {
-		case 'shutdown':
-			setTimeout(() => server.close(() => process.exit(0)), 3000)
-			break
-		default:
-			return
-	}
-
-})
-
 module.exports = (function clusterCerebellumWorker() {
 
 	let listener = []
 
-	return {
+	function _callShutDownListener() {
 
+		const _close = () => process.exit(0)
+
+		if(listener.length > 0) {
+			
+			process.exit(0)
+			return
+
+		}
+		
+		listener.forEach( func => func(_close))
+
+	}
+	process.on('message', msg => {
+
+		switch(msg.type) {
+			case 'shutdown':
+				_callShutDownListener()
+				break
+			default:
+				return
+		}
+
+	})
+
+	return {
+		onShutdown: function addShutdownListener(func) {
+
+			listener = [].concat(listener, func)
+
+		}
 	}
 
 })()

@@ -1,29 +1,8 @@
 const cluster = require('cluster')
+const worker = require('../src/worker')
 
-const server = require('net')
-	.createServer()
-	.listen(9001)
+const server = require('net').createServer().listen(9001)
 
-const timeout = (Math.floor(Math.random() * (10)) + 1)
+worker.onShutdown(exit => setTimeout(() => server.close(exit), 3000))
 
-setTimeout(() => {
 
-	if(timeout > 2) {
-
-		// throw new Error('custom error')
-
-	}
-
-}, 1000)
-
-process.on('message', msg => {
-
-	switch(msg.type) {
-		case 'shutdown':
-			setTimeout(() => server.close(() => process.exit(0)), 3000)
-			break
-		default:
-			return
-	}
-
-})

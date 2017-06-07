@@ -25,17 +25,17 @@ cerebellum.startCluster()
 ```javascript
 cerebellum.setupCluster({
 	// cluster.setupMaster
-	exec
-	args
-	silent
-	stdio
+	exec: 'worker.js',
+	args: '{ arg1: "someValue" }',
+	silent: false
+	stdio: 
 	// cerebellum config
-	numberOfWorkers
-	restartAfterError
-	timeToWaitBeforeKill
-	useOnline
+	numberOfWorkers: 4,
+	restart: true
+	timeToWaitBeforeKill: 2000,
+	useOnline: false,
 	// functions
-	log
+	log: (worker, message) => console.log(`${worker.process.pid} => ${message}`),
 	// stat
 })
 ```
