@@ -44,7 +44,7 @@ function _createSetupMasterSettings(config) {
 
 			switch(key) {
 				case 'args':
-					value = process.env[environmentKey].split(',')
+					value = process.env[environmentKey].split(' ')
 					break
 				case 'silent':
 					value = _stringToBoolean(process.env[environmentKey])
@@ -71,10 +71,10 @@ module.exports = function _createCerebellumClusterSettings( config ) {
 	return {
 		cluster: 						_createSetupMasterSettings(config),
 		expectedNumberOfWorkers: 		config.numberOfWorkers || process.env.CEREBELLUM_NUM_OF_WORKERS || os.cpus().length,
-		restart: 						config.restart || false,
-		timeToWaitBeforeKill: 			config.timeToWaitBeforeKill || process.env.CEREBELLUM_WORKER_TIMEOUT || 2000,
+		restart: 						config.restart || _stringToBoolean(process.env.CEREBELLUM_RESTART_WORKERS) || false,
+		timeToWaitBeforeKill: 			config.timeToWaitBeforeKill || process.env.CEREBELLUM_WORKER_TIMEOUT || 5000,
 		useOnline: 						config.useOnline || process.env.CEREBELLUM_USE_ONLINE || false,
-		log: 							typeof config.log === 'function' ? config.log : worker => debug(`cerebellum:${worker.process.pid}`)
+		log: 							typeof config.log === 'function' ? worker => config.log(worker) : worker => debug(`cerebellum:${worker.process.pid}`)
 	}
 
 }

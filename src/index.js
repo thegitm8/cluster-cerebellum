@@ -95,16 +95,13 @@ function CerebellumInterface() {
 	 * [startCluster description]
 	 * @return {[type]} [description]
 	 */
-	this.startCluster = function _startCluster(config) {
+	this.startCluster = function _startCluster(env) {
 
 		debug('Starting a new cluster.')
 
 		const that = this
 		const _runningWorkers = () => cluster.workers ? Object.keys(cluster.workers).length : 0
 		const currentNumberOfWorkers 	= () => Object.keys(cluster.workers).length
-
-		if(!that.settings)
-			that.settings = cerebellumSetupCluster(config)
 
 		// forking worker until runningWorkers === expectedNumberOfWorkers
 		while(_runningWorkers() <= that.settings.expectedNumberOfWorkers) {
