@@ -18,6 +18,7 @@ module.exports = (function clusterCerebellumWorker() {
 		listener.forEach( func => func(_close))
 
 	}
+	
 	process.on('message', msg => {
 
 		switch(msg.type) {

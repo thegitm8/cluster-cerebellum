@@ -1,97 +1,123 @@
-var cluster         = require('cluster');
-var os              = require('os');
-var expect          = require('chai').expect;
-var sinon           = require('sinon');
+const cluster 	= require('cluster')
+const os 		= require('os')
+const expect 	= require('chai').expect
+const sinon 	= require('sinon')
 
 describe('cluster-cerebellum', function() {
-    var clusterTools;
 
-    before(function() {
-        cluster.setupMaster({ exec: 'test/test_worker.js' });
-    });
+	let cerebellum
 
-    beforeEach(function() {
-        delete require.cache[require.resolve('../src')];
-        clusterTools = require(require.resolve('../src'));
-    });
+	before(function() {
+		
+		cerebellum = require(require.resolve('../src'))
+		cerebellum.setupCluster({ exec: 'test/test_worker.js' })
 
-    afterEach(function(done) {
-        Object.keys(cluster.workers)
-            .forEach(function(id) {
-                if (!cluster.workers[id].process.killed) {
-                    cluster.workers[id].kill();
-                }
-            });
+	})
 
-        done();
-    });
+	beforeEach(function() {
 
-    it('forks a specified worker process', function(done) {
-        var worker = cluster.fork();
+		delete require.cache[require.resolve('../src')]
+		cerebellum = require(require.resolve('../src'))
 
-        worker.on('online', function() {
-            expect(Object.keys(cluster.workers).length).to.equal(1);
-            done();
-        });
-    });
+	})
 
-    it('restarts all workers', function(done) {
-        var originalWorkers = [];
+	afterEach(function(done) {
 
-        for (var i = 0; i < os.cpus().length; i++) {
-            originalWorkers.push(cluster.fork());
-        }
+		Object.keys(cluster.workers)
+			.forEach(function(id) {
 
-        expect(Object.keys(cluster.workers).length).to.equal(os.cpus().length);
+				if (!cluster.workers[id].process.killed) {
 
-        var originalWorkerPids = originalWorkers.map(function(worker) {
-            return worker.process.pid;
-        });
+					cluster.workers[id].kill()
 
-        var restartEvent = clusterTools.gracefullRestart(originalWorkers);
+				}
 
-        restartEvent.on('workersRestarted', function() {
-            expect(Object.keys(cluster.workers).length).to.equal(os.cpus().length);
+			})
 
-            var newWorkers = Object.keys(cluster.workers).map(function(wId) {
-                return cluster.workers[wId];
-            });
+		done()
 
-            newWorkers.forEach(function(worker) {
-                expect(originalWorkerPids.indexOf(worker.process.pid)).to.equal(-1);
-            });
+	})
 
-            done();
-        });
-    });
+	it('forks a specified worker process', function(done) {
+
+		const worker = cluster.fork()
+
+		worker.on('online', function() {
+
+			expect(Object.keys(cluster.workers).length).to.equal(1)
+			done()
+
+		})
+
+	})
+
+	it('restarts all workers', function(done) {
+
+		const originalWorkers = []
+
+		for (let i = 0; i < os.cpus().length; i++) {
+
+			originalWorkers.push(cluster.fork())
+
+		}
+
+		expect(Object.keys(cluster.workers).length).to.equal(os.cpus().length)
+
+		const originalWorkerPids = originalWorkers.map(worker => worker.process.pid)
+		const restartEvent = cerebellum.restartCluster(originalWorkers)
+
+		restartEvent.on('workersRestarted', function() {
 
 
-    it('shuts down workers one after the other', function(done) {
-        var notifier = {};
-        var workers = [];
-        var numberOfWorkers = os.cpus().length;
+			const newWorkers = Object.keys(cluster.workers).map( wId => cluster.workers[wId])
 
-        for (var i = 0; i < numberOfWorkers; i++) {
-            var worker = cluster.fork();
-            notifier[worker.id] = sinon.spy();
-            workers.push(worker);
-        }
+			expect(newWorkers.length).to.equal(os.cpus().length)
 
-        expect(Object.keys(cluster.workers).length).to.equal(numberOfWorkers);
+			newWorkers.forEach( worker =>
+				expect(originalWorkerPids.indexOf(worker.process.pid)).to.equal(-1)
+			)
 
-        var restartEvents = clusterTools.gracefullRestart(workers);
+			done()
 
-        restartEvents.on('workerStopped', function(stoppedWorker) {
-            notifier[stoppedWorker.id]();
-        });
+		})
 
-        restartEvents.on('workersRestarted', function() {
-            // skipping first worker
-            for (var j = 1; j < numberOfWorkers; j++) {
-                expect(notifier[workers[j].id].calledAfter(notifier[workers[j - 1].id])).to.be.ok;
-            }
+	})
 
-            done();
-        });
-    });
-});
+
+	it('shuts down workers one after the other', function(done) {
+
+		const notifier = {}
+		const workers = []
+		const numberOfWorkers = os.cpus().length
+
+		for (let i = 0; i < numberOfWorkers; i++) {
+
+			const worker = cluster.fork()
+
+			notifier[worker.id] = sinon.spy()
+			workers.push(worker)
+
+		}
+
+		expect(Object.keys(cluster.workers).length).to.equal(numberOfWorkers)
+
+		const restartEvents = cerebellum.restartCluster(workers)
+
+		restartEvents.on('workerStopped', stoppedWorker => notifier[stoppedWorker.id]())
+
+		restartEvents.on('workersRestarted', function() {
+
+			// skipping first worker
+			for (let j = 1; j < numberOfWorkers; j++) {
+
+				expect(notifier[workers[j].id].calledAfter(notifier[workers[j - 1].id])).to.be.ok
+
+			}
+
+			done()
+
+		})
+
+	})
+
+})

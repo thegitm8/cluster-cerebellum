@@ -51,8 +51,6 @@ function CerebellumInterface() {
 				.on(worker.useOnline ? 'online' : 'listening', () => worker.emit('_cerebellumWorkerStarted'))
 				.on('_cerebellumWorkerStarted', () => {
 
-					
-
 					worker.log(`[${Object.keys(cluster.workers).length}/${worker.expectedNumberOfWorkers}] New worker forked.`)
 
 					process.nextTick(() => worker.emit('workerStarted', worker))
