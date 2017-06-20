@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rm -rf lib/ && ./node_modules/.bin/babel src --out-dir lib --ignore test/*.spec.js",
     "dev": "./node_modules/.bin/babel src -d lib --watch",
-    "test": "./node_modules/.bin/mocha",
+    "test": "npm run build && ./node_modules/.bin/mocha",
     "example:basic": "DEBUG=cerebellum* node example/basic"
   },
   "keywords": [

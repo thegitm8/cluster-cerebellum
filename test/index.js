@@ -1,50 +1,42 @@
-const cluster 	= require('cluster')
-const os 		= require('os')
-const expect 	= require('chai').expect
-const sinon 	= require('sinon')
+var cluster = require('cluster')
+var os 		= require('os')
+var expect 	= require('chai').expect
+var sinon 	= require('sinon')
 
 describe('cluster-cerebellum', function() {
 
-	let cerebellum
-
-	before(function() {
-		
-		cerebellum = require(require.resolve('../src'))
-		cerebellum.setupCluster({ exec: 'test/test_worker.js' })
-
-	})
+	var expectedNumberOfWorkers = os.cpus().length
+	var workerFile = 'test/test_worker.js'
+	var cerebellum
 
 	beforeEach(function() {
 
-		delete require.cache[require.resolve('../src')]
-		cerebellum = require(require.resolve('../src'))
+		delete require.cache[require.resolve('../lib')]
+		cerebellum = require(require.resolve('../lib'))
 
+		cerebellum.setupCluster({
+			exec: 					workerFile,
+			numberOfWorkers: 		expectedNumberOfWorkers,
+			timeToWaitBeforeKill: 	100
+		})
+		
 	})
 
 	afterEach(function(done) {
 
-		Object.keys(cluster.workers)
-			.forEach(function(id) {
+		cerebellum.killCluster()
 
-				if (!cluster.workers[id].process.killed) {
-
-					cluster.workers[id].kill()
-
-				}
-
-			})
-
-		done()
+		cerebellum.on('allWorkersKilled', done)
 
 	})
 
-	it('forks a specified worker process', function(done) {
+	it('starts a cluster with a specified number of workers.', function(done) {
 
-		const worker = cluster.fork()
+		cerebellum.startCluster()
 
-		worker.on('online', function() {
+		cerebellum.on('allWorkersStarted', function() {
 
-			expect(Object.keys(cluster.workers).length).to.equal(1)
+			expect(Object.keys(cluster.workers).length).to.equal(expectedNumberOfWorkers)
 			done()
 
 		})
@@ -53,25 +45,31 @@ describe('cluster-cerebellum', function() {
 
 	it('restarts all workers', function(done) {
 
-		const originalWorkers = []
+		cerebellum.startCluster()
 
-		for (let i = 0; i < os.cpus().length; i++) {
+		var originalWorkerPids
 
-			originalWorkers.push(cluster.fork())
+		cerebellum.on('allWorkersStarted', function() {
 
-		}
+			originalWorkerPids = Object.keys(cluster.workers).map(function (w) {
 
-		expect(Object.keys(cluster.workers).length).to.equal(os.cpus().length)
+				return cluster.workers[w].process.pid
 
-		const originalWorkerPids = originalWorkers.map(worker => worker.process.pid)
-		const restartEvent = cerebellum.restartCluster(originalWorkers)
+			})
 
-		restartEvent.on('workersRestarted', function() {
+			cerebellum.restartCluster()
 
+		})
 
-			const newWorkers = Object.keys(cluster.workers).map( wId => cluster.workers[wId])
+		cerebellum.on('allWorkersRestarted', function() {
 
-			expect(newWorkers.length).to.equal(os.cpus().length)
+			var newWorkers = Object.keys(cluster.workers).map(function(w) {
+
+				return cluster.workers[w]
+
+			})
+
+			expect(newWorkers.length).to.equal(expectedNumberOfWorkers)
 
 			newWorkers.forEach( worker =>
 				expect(originalWorkerPids.indexOf(worker.process.pid)).to.equal(-1)
@@ -84,40 +82,40 @@ describe('cluster-cerebellum', function() {
 	})
 
 
-	it('shuts down workers one after the other', function(done) {
+	// it('shuts down workers one after the other', function(done) {
 
-		const notifier = {}
-		const workers = []
-		const numberOfWorkers = os.cpus().length
+	// 	const notifier = {}
+	// 	const workers = []
+	// 	const numberOfWorkers = os.cpus().length
 
-		for (let i = 0; i < numberOfWorkers; i++) {
+	// 	for (let i = 0; i < numberOfWorkers; i++) {
 
-			const worker = cluster.fork()
+	// 		const worker = cluster.fork()
 
-			notifier[worker.id] = sinon.spy()
-			workers.push(worker)
+	// 		notifier[worker.id] = sinon.spy()
+	// 		workers.push(worker)
 
-		}
+	// 	}
 
-		expect(Object.keys(cluster.workers).length).to.equal(numberOfWorkers)
+	// 	expect(Object.keys(cluster.workers).length).to.equal(numberOfWorkers)
 
-		const restartEvents = cerebellum.restartCluster(workers)
+	// 	const restartEvents = cerebellum.restartCluster(workers)
 
-		restartEvents.on('workerStopped', stoppedWorker => notifier[stoppedWorker.id]())
+	// 	restartEvents.on('workerStopped', stoppedWorker => notifier[stoppedWorker.id]())
 
-		restartEvents.on('workersRestarted', function() {
+	// 	restartEvents.on('workersRestarted', function() {
 
-			// skipping first worker
-			for (let j = 1; j < numberOfWorkers; j++) {
+	// 		// skipping first worker
+	// 		for (let j = 1; j < numberOfWorkers; j++) {
 
-				expect(notifier[workers[j].id].calledAfter(notifier[workers[j - 1].id])).to.be.ok
+	// 			expect(notifier[workers[j].id].calledAfter(notifier[workers[j - 1].id])).to.be.ok
 
-			}
+	// 		}
 
-			done()
+	// 		done()
 
-		})
+	// 	})
 
-	})
+	// })
 
 })

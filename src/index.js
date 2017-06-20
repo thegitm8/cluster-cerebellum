@@ -18,12 +18,18 @@ function CerebellumInterface() {
 
 	let haltCluster = false
 
+	this.clusterSettings = function _getClusterSettings() {
+
+		return this.settings
+
+	}
+
 	/**
 	 * [setupCluster description]
 	 * @param  {[type]} configuration [description]
 	 * @return {[type]}               [description]
 	 */
-	this.setupCluster = function _setupCluster(configuration) {
+	this.setupCluster = function _setupCluster(configuration = {}) {
 
 		debug('Setting up cluster.')
 
@@ -48,8 +54,7 @@ function CerebellumInterface() {
 			// creating unified and predictable worker events
 			worker
 				// starting worker
-				.on(worker.useOnline ? 'online' : 'listening', () => worker.emit('_cerebellumWorkerStarted'))
-				.on('_cerebellumWorkerStarted', () => {
+				.on(worker.useOnline ? 'online' : 'listening', () => {
 
 					worker.log(`[${Object.keys(cluster.workers).length}/${worker.expectedNumberOfWorkers}] New worker forked.`)
 
@@ -101,14 +106,16 @@ function CerebellumInterface() {
 		const _runningWorkers = () => cluster.workers ? Object.keys(cluster.workers).length : 0
 		const currentNumberOfWorkers 	= () => Object.keys(cluster.workers).length
 
-		// forking worker until runningWorkers === expectedNumberOfWorkers
+		if(!that.settings)
+			that.clusterSetup()
+
 		while(_runningWorkers() <= that.settings.expectedNumberOfWorkers) {
 
 			if(_runningWorkers() === that.settings.expectedNumberOfWorkers) {
 
 				// wait one tick before informing listeners
 				process.nextTick(() => that.emit('allWorkersStarted'))
-				break
+				return that
 
 			}
 
@@ -140,9 +147,15 @@ function CerebellumInterface() {
 
 		debug('Killing cluster.')
 
+		const that = this
+
 		haltCluster = true
 
 		Object.keys(cluster.workers).forEach( pid => cluster.workers[pid].kill() )
+
+		process.nextTick(() => that.emit('allWorkersKilled'))
+
+		return that
 
 	}
 
@@ -158,10 +171,13 @@ function CerebellumInterface() {
 		const that = this
 
 		function restartWorker(workers) {
+			console.log('PING')
 
 			if(workers.length < 1) {
+
 				that.emit('allWorkersRestarted')
-				return
+				return that
+
 			}
 
 			const worker = workers[0]
@@ -174,7 +190,7 @@ function CerebellumInterface() {
 
 		const workersToRestart = Object.keys(cluster.workers).map( id => cluster.workers[id] )
 
-		return restartWorker(workersToRestart)
+		restartWorker(workersToRestart)
 
 	}
 

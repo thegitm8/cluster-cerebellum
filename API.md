@@ -17,6 +17,7 @@
 
 ## Events
 ### Events (cluster)
+#### Event: `allWorkersKilled`
 #### Event: `allWorkersRestarted`
 #### Event: `allWorkersStarted`
 #### Event: `restartedWorker`
