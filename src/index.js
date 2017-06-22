@@ -16,7 +16,8 @@ function CerebellumInterface() {
 	// cerebellum is an instance of eventEmitter
 	EventEmitter.call(this)
 
-	let haltCluster = false
+	let haltingCluster = false
+	let restartingCluster = false
 
 	this.clusterSettings = function _getClusterSettings() {
 
@@ -80,7 +81,7 @@ function CerebellumInterface() {
 				.on('error', () => worker.log('error'))
 				.on('workerStopped', () => {
 
-					if(worker.restart && !haltCluster) {
+					if(worker.restart && !haltingCluster) {
 
 						worker.log('Restarting worker.')
 						cluster.fork()
@@ -96,7 +97,8 @@ function CerebellumInterface() {
 
 	/**
 	 * [startCluster description]
-	 * @return {[type]} [description]
+	 * @param  {[type]} env [description]
+	 * @return {[type]}     [description]
 	 */
 	this.startCluster = function _startCluster(env) {
 
@@ -133,9 +135,11 @@ function CerebellumInterface() {
 
 		debug('Halting the cluster.')
 
-		haltCluster = true
+		haltingCluster = true
 
-		Object.keys(cluster.workers).forEach( pid => cerebellumStopWorkerGracefully(cluster.workers[pid], false) )
+		Object
+			.keys(cluster.workers)
+			.forEach( pid => cerebellumStopWorkerGracefully(cluster.workers[pid]) )
 
 	}
 
@@ -149,13 +153,13 @@ function CerebellumInterface() {
 
 		const that = this
 
-		haltCluster = true
+		haltingCluster = true
 
-		Object.keys(cluster.workers).forEach( pid => cluster.workers[pid].kill() )
+		Object
+			.keys(cluster.workers)
+			.forEach( pid => cluster.workers[pid].kill() )
 
 		process.nextTick(() => that.emit('allWorkersKilled'))
-
-		return that
 
 	}
 
