@@ -5,6 +5,8 @@ var sinon 	= require('sinon')
 
 describe('cluster-cerebellum', function() {
 
+	this.timeout = 5000
+	
 	var expectedNumberOfWorkers = os.cpus().length
 	var workerFile = 'test/test_worker.js'
 	var cerebellum
@@ -17,8 +19,7 @@ describe('cluster-cerebellum', function() {
 		cerebellum.setupCluster({
 			exec: 					workerFile,
 			numberOfWorkers: 		expectedNumberOfWorkers,
-			timeToWaitBeforeKill: 	1000,
-			// log: 					w => msg => console.log(w.id, msg)
+			timeToWaitBeforeKill: 	100
 		})
 		
 	})
