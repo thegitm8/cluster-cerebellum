@@ -66,16 +66,19 @@ function CerebellumInterface() {
 				.on('disconnect', () => exitToDisconnectDelay = Date.now())
 				.on('exit', (code, signal) => {
 
+					if(cluster.workers[worker.id]) {
+						
+						// remove worker from cluster.workers object
+						delete cluster.workers[worker.id]
 
-					// remove worker from cluster.workers object
-					delete cluster.workers[worker.id]
+					}
 
 					worker.log(`[${Object.keys(cluster.workers).length}/${worker.expectedNumberOfWorkers}] Worker stopped with signal [${signal}] and code [${code}].`)
 
 					worker.log(`Delay between "exit" and "disconnect": ${Date.now() - exitToDisconnectDelay}`)
 
-					process.nextTick(() => worker.emit('workerStopped', worker))
-					process.nextTick(() => that.emit('workerStopped', worker))
+					worker.emit('workerStopped', worker)
+					// process.nextTick(() => that.emit('workerStopped', worker))
 
 				})
 				.on('error', () => worker.log('error'))
@@ -84,7 +87,7 @@ function CerebellumInterface() {
 					if(worker.restart && !haltingCluster) {
 
 						worker.log('Restarting worker.')
-						cluster.fork()
+						// cluster.fork()
 
 					}
 
@@ -175,20 +178,26 @@ function CerebellumInterface() {
 		const that = this
 
 		function restartWorker(workers) {
-			console.log('PING')
 
 			if(workers.length < 1) {
 
 				that.emit('allWorkersRestarted')
-				return that
+				return
 
 			}
 
 			const worker = workers[0]
 			const nextWorkers = workers.slice(1)
 
-			return cerebellumStopWorkerGracefully(worker)
-				.on('workerStopped', () => restartWorker(nextWorkers))
+			worker.log('Restarting')
+			cerebellumStopWorkerGracefully(worker)
+			worker.on('exit', () => {
+
+				worker.log('Stopped. Restarting next worker.')
+				cluster.fork()
+				restartWorker(nextWorkers)
+
+			})
 
 		}
 

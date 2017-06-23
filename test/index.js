@@ -17,7 +17,8 @@ describe('cluster-cerebellum', function() {
 		cerebellum.setupCluster({
 			exec: 					workerFile,
 			numberOfWorkers: 		expectedNumberOfWorkers,
-			timeToWaitBeforeKill: 	100
+			timeToWaitBeforeKill: 	1000,
+			// log: 					w => msg => console.log(w.id, msg)
 		})
 		
 	})
