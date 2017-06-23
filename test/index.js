@@ -5,8 +5,8 @@ var sinon 	= require('sinon')
 
 describe('cluster-cerebellum', function() {
 
-	this.timeout = 5000
-	
+	this.timeout(5000)
+
 	var expectedNumberOfWorkers = os.cpus().length
 	var workerFile = 'test/test_worker.js'
 	var cerebellum
