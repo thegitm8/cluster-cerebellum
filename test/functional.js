@@ -138,7 +138,7 @@ describe('cluster-cerebellum functional tests', function() {
 
 	})
 
-	describe('startup/restart', function() {
+	describe('startup', function() {
 
 		it('starts a cluster with a specified number of workers.', function(done) {
 
@@ -153,6 +153,10 @@ describe('cluster-cerebellum functional tests', function() {
 			})
 
 		})
+
+	})
+
+	describe('restart', function() {
 
 		it('restarts all workers', function(done) {
 
@@ -181,7 +185,7 @@ describe('cluster-cerebellum functional tests', function() {
 
 				})
 
-				expect(newWorkers.length).to.equal(expectedNumberOfWorkers)
+				expect(newWorkers.length).to.equal(defaultClusterConfig.numberOfWorkers)
 
 				newWorkers.forEach( worker =>
 					expect(originalWorkerPids.indexOf(worker.process.pid)).to.equal(-1)
