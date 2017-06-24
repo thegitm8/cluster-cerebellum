@@ -70,10 +70,10 @@ module.exports = function _createCerebellumClusterSettings( config ) {
 
 	return {
 		cluster: 						_createSetupMasterSettings(config),
-		expectedNumberOfWorkers: 		config.numberOfWorkers || process.env.CEREBELLUM_NUM_OF_WORKERS || os.cpus().length,
+		expectedNumberOfWorkers: 		config.numberOfWorkers || parseInt(process.env.CEREBELLUM_NUM_OF_WORKERS, 10) || os.cpus().length,
 		restart: 						config.restart || _stringToBoolean(process.env.CEREBELLUM_RESTART_WORKERS) || false,
-		timeToWaitBeforeKill: 			config.timeToWaitBeforeKill || process.env.CEREBELLUM_WORKER_TIMEOUT || 5000,
-		useOnline: 						config.useOnline || process.env.CEREBELLUM_USE_ONLINE || false,
+		timeToWaitBeforeKill: 			config.timeToWaitBeforeKill || parseInt(process.env.CEREBELLUM_WORKER_TIMEOUT, 10) || 5000,
+		useOnline: 						config.useOnline || _stringToBoolean(process.env.CEREBELLUM_USE_ONLINE) || false,
 		log: 							typeof config.log === 'function' ? worker => config.log(worker) : worker => debug(`cerebellum:${worker.process.pid}`)
 	}
 

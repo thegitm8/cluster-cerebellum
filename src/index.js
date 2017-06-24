@@ -21,7 +21,7 @@ function CerebellumInterface() {
 
 	this.clusterSettings = function _getClusterSettings() {
 
-		return this.settings
+		return Object.assign({}, this.settings)
 
 	}
 
@@ -112,7 +112,7 @@ function CerebellumInterface() {
 		const currentNumberOfWorkers 	= () => Object.keys(cluster.workers).length
 
 		if(!that.settings)
-			that.clusterSetup()
+			that.setupCluster()
 
 		while(_runningWorkers() <= that.settings.expectedNumberOfWorkers) {
 

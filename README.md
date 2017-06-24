@@ -1,7 +1,8 @@
 # cluster-cerebellum
+:exclamation: **This is still in alpha and API may change.**
+
 `cluster-cerebellum` is a cluster control module. It complements the native `cluster` module and adds features like consecutive restarts of worker processes.
 
-:exclamation: This is still in alpha and API may change.
 
 1. [Installation](#installation)
 2. [Usage](#usage)
